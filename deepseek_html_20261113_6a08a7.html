@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pabrik Sortir Kubus & Balok</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        font-family: 'Fredoka One', cursive, sans-serif;
+        color: white;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        user-select: none;
+    }
+
+    /* HEADER & SKOR */
+    .header {
+        display: flex;
+        justify-content: space-between;
+        padding: 15px 30px;
+        background: rgba(0, 0, 0, 0.3);
+        font-size: 24px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    .skor-box { color: #FFD700; text-shadow: 2px 2px 0 #b8860b; }
+    .nyawa-box { color: #FF4500; text-shadow: 2px 2px 0 #8b0000; }
+
+    /* AREA JATUH */
+    #game-area {
+        flex: 1;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* KARTU CIRI-CIRI */
+    .kartu {
+        position: absolute;
+        background: #FFE4B5;
+        color: #333;
+        padding: 15px;
+        border-radius: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        box-shadow: 0 6px 0 #D2B48C, 0 10px 15px rgba(0,0,0,0.3);
+        border: 3px solid #fff;
+        width: 180px;
+        cursor: grab;
+        transition: transform 0.1s;
+        font-family: Arial, sans-serif;
+    }
+    .kartu:active { cursor: grabbing; transform: scale(1.05); }
+
+    /* KERANJANG SORTIR */
+    .keranjang-container {
+        display: flex;
+        justify-content: space-around;
+        padding: 20px 10px;
+        background: #2c3e50;
+        border-top: 5px solid #1abc9c;
+    }
+    
+    .keranjang {
+        width: 40%;
+        max-width: 300px;
+        height: 120px;
+        border-radius: 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        border: 4px dashed rgba(255,255,255,0.5);
+        transition: all 0.3s;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+    }
+    #keranjang-kubus { background: #e74c3c; }
+    #keranjang-balok { background: #3498db; }
+
+    .keranjang.hover {
+        transform: scale(1.05);
+        border-color: white;
+        box-shadow: inset 0 0 30px rgba(255,255,255,0.5), 0 0 20px white;
+    }
+
+    /* POP-UP GAME OVER */
+    #game-over {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85);
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+    }
+    #game-over h1 { font-size: 50px; color: #FFD700; margin-bottom: 10px; }
+    #game-over h2 { font-size: 30px; margin-top: 0; }
+    #btn-start {
+        padding: 15px 40px;
+        font-size: 24px;
+        font-family: 'Fredoka One', cursive;
+        background: #2ecc71;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        box-shadow: 0 6px 0 #27ae60;
+        margin-top: 20px;
+    }
+    #btn-start:active { transform: translateY(4px); box-shadow: 0 2px 0 #27ae60; }
+
+    .float-text {
+        position: absolute;
+        font-size: 30px;
+        font-weight: bold;
+        pointer-events: none;
+        animation: floatUp 1s ease-out forwards;
+        z-index: 50;
+    }
+    @keyframes floatUp {
+        0% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+    }
+</style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="skor-box">⭐ Skor: <span id="skor">0</span></div>
+        <div class="nyawa-box">❤️ Nyawa: <span id="nyawa">3</span></div>
+    </div>
+
+    <div id="game-area">
+        <!-- Kartu jatuh akan muncul di sini -->
+        
+        <!-- Overlay Game Over -->
+        <div id="game-over">
+            <h1 id="go-title">Waktu Habis!</h1>
+            <h2 id="go-skor">Skor Akhir: 0</h2>
+            <button id="btn-start" onclick="mulaiGame()">Main Lagi 🎮</button>
+        </div>
+    </div>
+
+    <div class="keranjang-container">
+        <div class="keranjang" id="keranjang-kubus" data-tipe="kubus">
+            <span style="font-size: 40px;">🧊</span>
+            KUBUS
+        </div>
+        <div class="keranjang" id="keranjang-balok" data-tipe="balok">
+            <span style="font-size: 40px;">📦</span>
+            BALOK
+        </div>
+    </div>
+
+<script>
+    // DATA CIRI-CIRI
+    const daftarCiri = [
+        { teks: "Semua sisi berbentuk persegi", tipe: "kubus" },
+        { teks: "Memiliki 6 sisi persegi panjang", tipe: "balok" },
+        { teks: "Semua rusuknya sama panjang", tipe: "kubus" },
+        { teks: "Rusuknya ada 3 kelompok ukuran", tipe: "balok" },
+        { teks: "Sisi berhadapan sama besar", tipe: "balok" },
+        { teks: "Contoh: Dadu", tipe: "kubus" },
+        { teks: "Contoh: Kotak susu", tipe: "balok" },
+        { teks: "Contoh: Brankas", tipe: "kubus" },
+        { teks: "Panjang, lebar, tinggi berbeda", tipe: "balok" },
+        { teks: "12 rusuk sama panjang", tipe: "kubus" }
+    ];
+
+    let skor = 0;
+    let nyawa = 3;
+    let gameBerjalan = false;
+    let intervalJatuh;
+    let kecepatanJatuh = 0.8; // piksel per frame
+    let daftarKartuAktif = [];
+    let frameAnimasi;
+
+    const gameArea = document.getElementById('game-area');
+    const keranjangKubus = document.getElementById('keranjang-kubus');
+    const keranjangBalok = document.getElementById('keranjang-balok');
+    const uiSkor = document.getElementById('skor');
+    const uiNyawa = document.getElementById('nyawa');
+    const overlayGameOver = document.getElementById('game-over');
+
+    // FUNGSI MULAI GAME
+    function mulaiGame() {
+        skor = 0;
+        nyawa = 3;
+        kecepatanJatuh = 0.8;
+        daftarKartuAktif = [];
+        gameArea.querySelectorAll('.kartu').forEach(el => el.remove());
+        
+        uiSkor.innerText = skor;
+        uiNyawa.innerText = nyawa;
+        overlayGameOver.style.display = 'none';
+        gameBerjalan = true;
+
+        // Pancingan kartu pertama muncul setelah 1 detik
+        setTimeout(munculkanKartu, 1000);
+        
+        // Loop animasi jatuh
+        if(frameAnimasi) cancelAnimationFrame(frameAnimasi);
+        loopAnimasi();
+    }
+
+    // FUNGSI MEMUNCULKAN KARTU
+    function munculkanKartu() {
+        if (!gameBerjalan) return;
+
+        // Ambil data acak
+        const data = daftarCiri[Math.floor(Math.random() * daftarCiri.length)];
+        
+        // Buat elemen kartu
+        const kartu = document.createElement('div');
+        kartu.className = 'kartu';
+        kartu.innerText = data.teks;
+        kartu.dataset.tipe = data.tipe; // Simpan jawaban yang benar
+
+        // Posisi awal (kiri/kanan acak)
+        const maxX = gameArea.clientWidth - 220;
+        kartu.style.left = Math.max(10, Math.random() * maxX) + 'px';
+        kartu.style.top = '-100px';
+
+        // Buat interaktif (bisa di-drag)
+        aktifkanDrag(kartu);
+
+        gameArea.appendChild(kartu);
+        daftarKartuAktif.push(kartu);
+
+        // Jadwalkan kartu berikutnya
+        const jeda = Math.max(1200, 2500 - (skor * 20)); // Makin tinggi skor, makin cepat
+        intervalJatuh = setTimeout(munculkanKartu, jeda);
+    }
+
+    // LOOP ANIMASI JATUH
+    function loopAnimasi() {
+        if (!gameBerjalan) return;
+
+        daftarKartuAktif.forEach(kartu => {
+            if (kartu.dataset.diDrag === "true") return; // Jangan jatuh jika sedang di-drag
+
+            let top = parseFloat(kartu.style.top || '-100');
+            top += kecepatanJatuh;
+            kartu.style.top = top + 'px';
+
+            // Jika menyentuh lantai (lewat area game)
+            if (top > gameArea.clientHeight - 50) {
+                kartu.remove();
+                kartu.dataset.hancur = "true";
+                kurangiNyawa(kartu);
+            }
+        });
+
+        // Bersihkan array dari kartu yang sudah hancur
+        daftarKartuAktif = daftarKartuAktif.filter(k => k.dataset.hancur !== "true");
+
+        frameAnimasi = requestAnimationFrame(loopAnimasi);
+    }
+
+    // FITUR DRAG & DROP
+    function aktifkanDrag(kartu) {
+        let startX, startY, initialX, initialY;
+
+        kartu.addEventListener('mousedown', dragStart);
+        kartu.addEventListener('touchstart', dragStart, {passive: false});
+
+        function dragStart(e) {
+            if(!gameBerjalan) return;
+            e.preventDefault();
+            kartu.dataset.diDrag = "true";
+            
+            // Dapatkan koordinat klik
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+
+            const rect = kartu.getBoundingClientRect();
+            const areaRect = gameArea.getBoundingClientRect();
+
+            initialX = rect.left - areaRect.left;
+            initialY = rect.top - areaRect.top;
+            startX = clientX;
+            startY = clientY;
+
+            kartu.style.cursor = 'grabbing';
+            kartu.style.zIndex = 100;
+
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('touchmove', drag, {passive: false});
+            document.addEventListener('touchend', dragEnd);
+        }
+
+        function drag(e) {
+            if(!gameBerjalan) return;
+            e.preventDefault();
+            const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+
+            const dx = clientX - startX;
+            const dy = clientY - startY;
+
+            kartu.style.left = (initialX + dx) + 'px';
+            kartu.style.top = (initialY + dy) + 'px';
+
+            // Cek apakah di atas keranjang
+            cekHoverKeranjang(clientX, clientY);
+        }
+
+        function dragEnd(e) {
+            if(!gameBerjalan) return;
+            kartu.dataset.diDrag = "false";
+            kartu.style.cursor = 'grab';
+            kartu.style.zIndex = 1;
+
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchmove', drag);
+            document.removeEventListener('touchend', dragEnd);
+
+            // Lepas hover
+            keranjangKubus.classList.remove('hover');
+            keranjangBalok.classList.remove('hover');
+
+            // Cek Drop
+            const clientX = e.type.includes('mouse') ? e.clientX : e.changedTouches[0].clientX;
+            const clientY = e.type.includes('mouse') ? e.clientY : e.changedTouches[0].clientY;
+            
+            const dropTarget = cekDropKeranjang(clientX, clientY);
+            if (dropTarget) {
+                prosesSortir(kartu, dropTarget.dataset.tipe, clientX, clientY);
+            }
+        }
+    }
+
+    // CEK POSISI KURSOR DI KERANJANG (untuk efek hover)
+    function cekHoverKeranjang(x, y) {
+        if (isElemenDiBawahKursor(keranjangKubus, x, y)) {
+            keranjangKubus.classList.add('hover');
+            keranjangBalok.classList.remove('hover');
+        } else if (isElemenDiBawahKursor(keranjangBalok, x, y)) {
+            keranjangBalok.classList.add('hover');
+            keranjangKubus.classList.remove('hover');
+        } else {
+            keranjangKubus.classList.remove('hover');
+            keranjangBalok.classList.remove('hover');
+        }
+    }
+
+    // CEK APAKAH LEPAS DI KERANJANG
+    function cekDropKeranjang(x, y) {
+        if (isElemenDiBawahKursor(keranjangKubus, x, y)) return keranjangKubus;
+        if (isElemenDiBawahKursor(keranjangBalok, x, y)) return keranjangBalok;
+        return null;
+    }
+
+    // UTILITAS: CEK POSISI ELEMEN
+    function isElemenDiBawahKursor(el, x, y) {
+        const rect = el.getBoundingClientRect();
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    }
+
+    // PROSES JAWABAN BENAR/SALAH
+    function prosesSortir(kartu, tipeTujuan, x, y) {
+        const tipeBenar = kartu.dataset.tipe;
+        kartu.dataset.hancur = "true"; // Hapus dari array animasi
+
+        if (tipeTujuan === tipeBenar) {
+            // JAWABAN BENAR
+            skor += 10;
+            uiSkor.innerText = skor;
+            buatEfekTeks(x, y, "+10", "#2ecc71");
+            
+            // Efek visual
+            kartu.style.background = "#2ecc71";
+            kartu.style.color = "white";
+            kartu.innerText = "BENAR!";
+            setTimeout(() => kartu.remove(), 300);
+            
+            // Tambah kecepatan
+            kecepatanJatuh += 0.05;
+
+        } else {
+            // JAWABAN SALAH
+            buatEfekTeks(x, y, "SALAH!", "#e74c3c");
+            kartu.remove();
+            kurangiNyawa(kartu, true);
+        }
+    }
+
+    // EFEK TEKS TERBANG
+    function buatEfekTeks(x, y, teks, warna) {
+        const el = document.createElement('div');
+        el.className = 'float-text';
+        el.innerText = teks;
+        el.style.color = warna;
+        el.style.left = (x - 30) + 'px';
+        el.style.top = (y - 50) + 'px';
+        el.style.textShadow = "2px 2px 0 #000";
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+    }
+
+    // KURANGI NYAWA
+    function kurangiNyawa(kartu, dariKeranjang = false) {
+        if (dariKeranjang) kartu.remove(); // pastikan hilang
+
+        nyawa--;
+        uiNyawa.innerText = nyawa;
+        
+        // Efek getar di layar
+        document.body.style.transform = "translate(5px, 5px)";
+        setTimeout(() => document.body.style.transform = "translate(-5px, -5px)", 50);
+        setTimeout(() => document.body.style.transform = "translate(0, 0)", 100);
+
+        if (nyawa <= 0) {
+            gameSelesai();
+        }
+    }
+
+    // GAME OVER
+    function gameSelesai() {
+        gameBerjalan = false;
+        clearTimeout(intervalJatuh);
+        cancelAnimationFrame(frameAnimasi);
+        daftarKartuAktif.forEach(k => k.remove());
+
+        document.getElementById('go-title').innerText = "Game Over!";
+        document.getElementById('go-skor').innerText = "Skor Akhir: " + skor;
+        overlayGameOver.style.display = 'flex';
+    }
+
+    // Mulai pertama kali load (tampilkan layar start)
+    document.getElementById('go-title').innerText = "Pabrik Sortir";
+    document.getElementById('go-skor').innerText = "Seret ciri-ciri ke keranjang yang tepat!";
+    overlayGameOver.style.display = 'flex';
+
+</script>
+</body>
+</html>
